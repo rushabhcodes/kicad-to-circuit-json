@@ -1,3 +1,14 @@
+import type {
+  GrArc,
+  GrCircle,
+  GrCurve,
+  GrLine,
+  KicadPcb,
+  Layer,
+  PcbArc,
+  Xy,
+} from "kicadts"
+
 export interface PcbPoint {
   x: number
   y: number
@@ -10,76 +21,75 @@ export function normalizeToArray<T>(value: T | T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [value]
 }
 
-export function getLayerNames(layer: any): string[] {
+export function getLayerNames(
+  layer: Layer | string | null | undefined,
+): string[] {
   if (!layer) return []
   if (typeof layer === "string") return [layer]
-  return layer.names || layer._names || []
+  return layer.names || []
 }
 
-export function getGraphicLayerNames(graphic: any): string[] {
-  return getLayerNames(graphic?.layer ?? graphic?._sxLayer)
+export function getGraphicLayerNames(
+  graphic: { layer?: Layer | string | undefined } | null | undefined,
+): string[] {
+  return getLayerNames(graphic?.layer)
 }
 
-export function getPcbPoint(point: any): PcbPoint {
+export function getPcbPoint(
+  point: { x: number; y: number } | null | undefined,
+): PcbPoint {
   return {
-    x: point?.x ?? point?._x ?? 0,
-    y: point?.y ?? point?._y ?? 0,
+    x: point?.x ?? 0,
+    y: point?.y ?? 0,
   }
 }
 
-export function getLineStartEnd(line: any): {
+export function getLineStartEnd(line: GrLine): {
   start: PcbPoint
   end: PcbPoint
 } {
   return {
-    start: getPcbPoint(line.start ?? line._sxStart),
-    end: getPcbPoint(line.end ?? line._sxEnd),
+    start: getPcbPoint(line.start),
+    end: getPcbPoint(line.end),
   }
 }
 
-export function getArcStartMidEnd(arc: any): {
+export function getArcStartMidEnd(arc: GrArc): {
   start: PcbPoint
   mid: PcbPoint
   end: PcbPoint
 } {
   return {
-    start: getPcbPoint(arc.start ?? arc._start ?? arc._sxStart),
-    mid: getPcbPoint(arc.mid ?? arc._mid ?? arc._sxMid),
-    end: getPcbPoint(arc.end ?? arc._end ?? arc._sxEnd),
+    start: getPcbPoint(arc.start),
+    mid: getPcbPoint(arc.mid),
+    end: getPcbPoint(arc.end),
   }
 }
 
-export function getGraphicArcs(kicadPcb: any): any[] {
-  const explicitGraphicArcs = normalizeToArray(kicadPcb?.graphicArcs)
-  if (explicitGraphicArcs.length > 0) {
-    return explicitGraphicArcs
+export function getCircleCenterEnd(circle: GrCircle): {
+  center: PcbPoint
+  end: PcbPoint
+} {
+  return {
+    center: getPcbPoint(circle.center),
+    end: getPcbPoint(circle.end),
   }
-
-  return normalizeToArray(kicadPcb?._otherChildren).filter(
-    (child) => child?.token === "gr_arc",
-  )
 }
 
-export function getGraphicCurves(kicadPcb: any): any[] {
-  const explicitGraphicCurves = normalizeToArray(kicadPcb?.graphicCurves)
-  if (explicitGraphicCurves.length > 0) {
-    return explicitGraphicCurves
-  }
-
-  return normalizeToArray(kicadPcb?._otherChildren).filter(
-    (child) => child?.token === "gr_curve",
-  )
+export function getGraphicArcs(kicadPcb: KicadPcb): GrArc[] {
+  return normalizeToArray(kicadPcb.graphicArcs)
 }
 
-export function getTopLevelCopperArcs(kicadPcb: any): any[] {
-  const explicitArcs = normalizeToArray(kicadPcb?.arcs)
-  if (explicitArcs.length > 0) {
-    return explicitArcs
-  }
+export function getGraphicCircles(kicadPcb: KicadPcb): GrCircle[] {
+  return normalizeToArray(kicadPcb.graphicCircles)
+}
 
-  return normalizeToArray(kicadPcb?._otherChildren).filter(
-    (child) => child?.token === "arc",
-  )
+export function getGraphicCurves(kicadPcb: KicadPcb): GrCurve[] {
+  return normalizeToArray(kicadPcb.graphicCurves)
+}
+
+export function getTopLevelCopperArcs(kicadPcb: KicadPcb): PcbArc[] {
+  return normalizeToArray(kicadPcb.arcs)
 }
 
 export function approximateArcPoints(
@@ -120,17 +130,16 @@ export function approximateArcPoints(
   return points
 }
 
-export function getCurvePoints(curve: any): {
+export function getCurvePoints(curve: GrCurve): {
   start: PcbPoint
   control1: PcbPoint
   control2: PcbPoint
   end: PcbPoint
 } | null {
-  const ptsData =
-    curve?._sxPts?.points ?? curve?.pts?.points ?? curve?.points ?? []
+  const ptsData = curve.points?.points ?? []
   const xyPoints = ptsData
-    .filter((point: any) => point?.token === "xy")
-    .map((point: any) => getPcbPoint(point))
+    .filter((point): point is Xy => point.token === "xy")
+    .map((point) => getPcbPoint(point))
 
   if (xyPoints.length < 4) {
     return null
@@ -182,6 +191,42 @@ export function approximateCubicBezierPoints(
         3 * omt ** 2 * t * control1.y +
         3 * omt * t ** 2 * control2.y +
         t ** 3 * end.y,
+    })
+  }
+
+  return points
+}
+
+export function approximateCirclePoints(
+  center: PcbPoint,
+  end: PcbPoint,
+  options?: {
+    segmentLength?: number
+    minSegments?: number
+  },
+): PcbPoint[] {
+  const radius = getDistance(center, end)
+  if (radius <= 0) {
+    return [center]
+  }
+
+  const segmentLength = options?.segmentLength ?? 0.25
+  const minSegments = options?.minSegments ?? 16
+  const circumference = FULL_TURN * radius
+  const numSegments = Math.max(
+    8,
+    minSegments,
+    Math.ceil(circumference / segmentLength),
+  )
+  const startAngle = Math.atan2(end.y - center.y, end.x - center.x)
+  const points: PcbPoint[] = []
+
+  for (let i = 0; i <= numSegments; i++) {
+    const t = i / numSegments
+    const angle = startAngle + FULL_TURN * t
+    points.push({
+      x: center.x + radius * Math.cos(angle),
+      y: center.y + radius * Math.sin(angle),
     })
   }
 
