@@ -18,7 +18,9 @@ import {
   getGraphicCurves,
   getGraphicLayerNames,
   getLineStartEnd,
+  getPcbPoint,
 } from "./arc-utils"
+import { rotatePoint } from "./CollectFootprintsStage/process-graphics"
 import { mapKicadJustifyToAnchorAlignment } from "./CollectFootprintsStage/text-utils"
 import {
   extractKicadLayerNames,
@@ -176,6 +178,8 @@ export class CollectGraphicsStage extends ConverterStage {
       edgeCutPrimitives.push(...this.getRectEdgeCutPrimitives(rect))
     }
 
+    edgeCutPrimitives.push(...this.getFootprintEdgeCutPrimitives())
+
     // Create board outline from edge cuts
     if (edgeCutPrimitives.length > 0) {
       this.createBoardOutline(edgeCutPrimitives)
@@ -251,6 +255,199 @@ export class CollectGraphicsStage extends ConverterStage {
         }
       })
       .filter((contour) => contour.points.length > 0)
+  }
+
+  private getFootprintEdgeCutPrimitives(): BoardPrimitive[] {
+    const footprints = this.ctx.kicadPcb?.footprints || []
+    const footprintArray = Array.isArray(footprints) ? footprints : [footprints]
+    const primitives: BoardPrimitive[] = []
+
+    for (const footprint of footprintArray) {
+      const position = footprint.position
+      const footprintPosition = getPcbPoint(position)
+      const footprintRotation = (position as any)?.angle ?? 0
+
+      const fpLines = footprint.fpLines || []
+      const fpLineArray = Array.isArray(fpLines) ? fpLines : [fpLines]
+      for (const line of fpLineArray) {
+        const layerStr = getGraphicLayerNames(line).join(" ")
+        if (!layerStr.includes("Edge.Cuts")) continue
+
+        const { start, end } = getLineStartEnd(line as any)
+        primitives.push(
+          this.transformFootprintPrimitive(
+            {
+              type: "line",
+              start,
+              end,
+            },
+            footprintPosition,
+            footprintRotation,
+          ),
+        )
+      }
+
+      const fpArcs = footprint.fpArcs || []
+      const fpArcArray = Array.isArray(fpArcs) ? fpArcs : [fpArcs]
+      for (const arc of fpArcArray) {
+        const layerStr = getGraphicLayerNames(arc).join(" ")
+        if (!layerStr.includes("Edge.Cuts")) continue
+
+        const { start, mid, end } = getArcStartMidEnd(arc as any)
+        primitives.push(
+          this.transformFootprintPrimitive(
+            {
+              type: "arc",
+              start,
+              mid,
+              end,
+            },
+            footprintPosition,
+            footprintRotation,
+          ),
+        )
+      }
+
+      const fpCircles = footprint.fpCircles || []
+      const fpCircleArray = Array.isArray(fpCircles) ? fpCircles : [fpCircles]
+      for (const circle of fpCircleArray) {
+        const layerStr = getGraphicLayerNames(circle).join(" ")
+        if (!layerStr.includes("Edge.Cuts")) continue
+
+        const { center, end } = getCircleCenterEnd(circle as any)
+        primitives.push(
+          this.transformFootprintPrimitive(
+            {
+              type: "circle",
+              center,
+              start: end,
+              end,
+            },
+            footprintPosition,
+            footprintRotation,
+          ),
+        )
+      }
+
+      const fpRects = footprint.fpRects || []
+      const fpRectArray = Array.isArray(fpRects) ? fpRects : [fpRects]
+      for (const rect of fpRectArray) {
+        const layerStr = getGraphicLayerNames(rect).join(" ")
+        if (!layerStr.includes("Edge.Cuts")) continue
+
+        primitives.push(
+          ...this.getRectEdgeCutPrimitives(rect).map((primitive) =>
+            this.transformFootprintPrimitive(
+              primitive,
+              footprintPosition,
+              footprintRotation,
+            ),
+          ),
+        )
+      }
+    }
+
+    return primitives
+  }
+
+  private transformFootprintPrimitive(
+    primitive: BoardPrimitive,
+    footprintPosition: { x: number; y: number },
+    footprintRotation: number,
+  ): BoardPrimitive {
+    if (primitive.type === "arc") {
+      return {
+        type: "arc",
+        start: this.transformFootprintPoint(
+          primitive.start,
+          footprintPosition,
+          footprintRotation,
+        ),
+        mid: this.transformFootprintPoint(
+          primitive.mid,
+          footprintPosition,
+          footprintRotation,
+        ),
+        end: this.transformFootprintPoint(
+          primitive.end,
+          footprintPosition,
+          footprintRotation,
+        ),
+      }
+    }
+
+    if (primitive.type === "circle") {
+      return {
+        type: "circle",
+        center: this.transformFootprintPoint(
+          primitive.center,
+          footprintPosition,
+          footprintRotation,
+        ),
+        start: this.transformFootprintPoint(
+          primitive.start,
+          footprintPosition,
+          footprintRotation,
+        ),
+        end: this.transformFootprintPoint(
+          primitive.end,
+          footprintPosition,
+          footprintRotation,
+        ),
+      }
+    }
+
+    if (primitive.type === "curve") {
+      return {
+        type: "curve",
+        start: this.transformFootprintPoint(
+          primitive.start,
+          footprintPosition,
+          footprintRotation,
+        ),
+        control1: this.transformFootprintPoint(
+          primitive.control1,
+          footprintPosition,
+          footprintRotation,
+        ),
+        control2: this.transformFootprintPoint(
+          primitive.control2,
+          footprintPosition,
+          footprintRotation,
+        ),
+        end: this.transformFootprintPoint(
+          primitive.end,
+          footprintPosition,
+          footprintRotation,
+        ),
+      }
+    }
+
+    return {
+      type: "line",
+      start: this.transformFootprintPoint(
+        primitive.start,
+        footprintPosition,
+        footprintRotation,
+      ),
+      end: this.transformFootprintPoint(
+        primitive.end,
+        footprintPosition,
+        footprintRotation,
+      ),
+    }
+  }
+
+  private transformFootprintPoint(
+    point: { x: number; y: number },
+    footprintPosition: { x: number; y: number },
+    footprintRotation: number,
+  ) {
+    const rotated = rotatePoint(point.x, point.y, -footprintRotation)
+    return {
+      x: footprintPosition.x + rotated.x,
+      y: footprintPosition.y + rotated.y,
+    }
   }
 
   private orderConnectedContours(primitives: BoardPrimitive[]) {
