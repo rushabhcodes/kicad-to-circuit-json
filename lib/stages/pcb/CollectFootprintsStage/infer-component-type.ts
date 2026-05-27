@@ -2,7 +2,7 @@ import type { Footprint } from "kicadts"
 import { findFootprintPropertyValue } from "./footprint-properties"
 
 /**
- * Infers the component type (ftype) from the reference designator
+ * Infers the component type (ftype) from the reference designator.
  */
 export function inferComponentType(
   reference: string | undefined,
@@ -10,7 +10,15 @@ export function inferComponentType(
 ): string {
   if (!reference && !footprint) return "simple_chip"
 
-  const prefix = reference?.trim().match(/^([A-Z]+)/)?.[1]
+  const normalizedReference = reference?.trim()
+  const prefix = normalizedReference?.match(/^([A-Z]+)/)?.[1]
+
+  if (
+    isFiducialReference(normalizedReference) ||
+    isFiducialFootprint(footprint)
+  ) {
+    return "simple_fiducial"
+  }
 
   switch (prefix) {
     case "R":
@@ -40,10 +48,23 @@ export function inferComponentType(
   }
 }
 
-function isLedFootprint(footprint: Footprint | undefined): boolean {
-  if (!footprint) return false
+function isFiducialReference(reference: string | undefined): boolean {
+  return /^FID\d+/i.test(reference || "")
+}
 
-  const metadata = [
+function isFiducialFootprint(footprint: Footprint | undefined): boolean {
+  return getFootprintMetadata(footprint).includes("fiducial")
+}
+
+function isLedFootprint(footprint: Footprint | undefined): boolean {
+  const metadata = getFootprintMetadata(footprint)
+  return metadata.includes("led") || metadata.includes("light emitting diode")
+}
+
+function getFootprintMetadata(footprint: Footprint | undefined): string {
+  if (!footprint) return ""
+
+  return [
     footprint.libraryLink,
     footprint.descr?.value,
     footprint.tags?.value,
@@ -54,8 +75,6 @@ function isLedFootprint(footprint: Footprint | undefined): boolean {
     .filter(Boolean)
     .join(" ")
     .toLowerCase()
-
-  return metadata.includes("led") || metadata.includes("light emitting diode")
 }
 
 /**
