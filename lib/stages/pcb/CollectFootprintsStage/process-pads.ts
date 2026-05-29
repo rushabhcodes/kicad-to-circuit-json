@@ -1,4 +1,4 @@
-import type { Footprint } from "kicadts"
+import type { Footprint, FootprintPad } from "kicadts"
 import type { ConverterContext } from "../../../types"
 import {
   getCopperSpanLayerRefsFromLayers,
@@ -54,7 +54,7 @@ export function processPad({
   componentCcwRotationDegrees,
 }: {
   ctx: ConverterContext
-  pad: any
+  pad: FootprintPad
   componentId: string
   kicadComponentPos: { x: number; y: number }
   componentCcwRotationDegrees: number

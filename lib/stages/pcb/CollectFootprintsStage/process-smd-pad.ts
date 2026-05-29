@@ -6,6 +6,9 @@ import type {
   PcbSmtPadRotatedPill,
   PcbSmtPadRotatedRect,
 } from "circuit-json"
+import type {
+  FootprintPad,
+} from "kicadts"
 import { applyToPoint } from "transformation-matrix"
 import type { ConverterContext } from "../../../types"
 import { determineLayerFromLayers } from "./layer-utils"
@@ -17,6 +20,28 @@ import {
   type Size,
 } from "./pad-utils"
 import { rotatePoint } from "./process-graphics"
+
+type PointLike = { x?: number; y?: number; xy?: { x?: number; y?: number } }
+type PtsLike = { points?: PointLike[]; pts?: PointLike[] }
+type PrimitiveLike = { token?: string }
+type PadPrimitiveCircleLike = PrimitiveLike & {
+  center?: { x: number; y: number }
+  end?: { x: number; y: number }
+  stroke?: { width?: number }
+  width?: number
+  fill?: { value?: string } | string
+  _sxCenter?: { x: number; y: number }
+  _sxEnd?: { x: number; y: number }
+  _sxWidth?: { value?: number }
+  _sxFill?: { value?: string }
+}
+type PadPrimitivePolyLike = PrimitiveLike & {
+  _sxPts?: PointLike[] | { points?: PointLike[]; pts?: PointLike[] }
+  points?: PointLike[] | { points?: PointLike[]; pts?: PointLike[] }
+  pts?: PointLike[]
+  _contours?: PtsLike[]
+  contours?: PtsLike[]
+}
 
 export function createSmdPad({
   ctx,
@@ -30,7 +55,7 @@ export function createSmdPad({
   totalCcwRotationDegrees = 0,
 }: {
   ctx: ConverterContext
-  pad: any
+  pad: FootprintPad
   componentId: string
   pos: Point
   size: Size
@@ -88,14 +113,18 @@ function createCustomSmdPadPrimitives({
   totalCcwRotationDegrees,
 }: {
   ctx: ConverterContext
-  pad: any
+  pad: FootprintPad
   componentId: string
   pcbPortId?: string
   padKicadPos: Point
   layer: string
   totalCcwRotationDegrees: number
 }): number {
-  const primitives = pad._sxPrimitives?._graphics || pad.primitives || []
+  const privatePad = pad as unknown as {
+    _sxPrimitives?: { _graphics?: PrimitiveLike[] }
+  }
+  const primitives =
+    privatePad._sxPrimitives?._graphics || pad.primitives?.graphics || []
   const primitivesArray = Array.isArray(primitives) ? primitives : [primitives]
   let primitivesProcessed = 0
 
@@ -103,7 +132,7 @@ function createCustomSmdPadPrimitives({
     if (primitive.token === "gr_poly") {
       const polygonPoints = getCustomPadPolygonPoints(
         {
-          primitive,
+          primitive: primitive as PadPrimitivePolyLike,
           padKicadPos,
           totalCcwRotationDegrees,
         },
@@ -128,7 +157,7 @@ function createCustomSmdPadPrimitives({
     if (primitive.token === "gr_circle") {
       const circle = getCustomPadCircle(
         {
-          primitive,
+          primitive: primitive as PadPrimitiveCircleLike,
           padKicadPos,
           totalCcwRotationDegrees,
         },
@@ -162,13 +191,13 @@ function getCustomPadPolygonPoints(
     padKicadPos,
     totalCcwRotationDegrees,
   }: {
-    primitive: any
+    primitive: PadPrimitivePolyLike
     padKicadPos: Point
     totalCcwRotationDegrees: number
   },
   ctx: ConverterContext,
 ): Point[] {
-  const grPoly = primitive.gr_poly || primitive
+  const grPoly = primitive
   const rawPoints = getCustomPrimitivePoints(grPoly)
   const points: Point[] = []
 
@@ -189,8 +218,8 @@ function getCustomPadPolygonPoints(
   return points
 }
 
-function getCustomPrimitivePoints(grPoly: any): any[] {
-  let rawPoints: any[] = []
+function getCustomPrimitivePoints(grPoly: PadPrimitivePolyLike): PointLike[] {
+  let rawPoints: PointLike[] = []
   const ptsContainer = grPoly._sxPts || grPoly.points || grPoly.pts
   const contours = grPoly._contours || grPoly.contours
 
@@ -220,13 +249,13 @@ function getCustomPadCircle(
     padKicadPos,
     totalCcwRotationDegrees,
   }: {
-    primitive: any
+    primitive: PadPrimitiveCircleLike
     padKicadPos: Point
     totalCcwRotationDegrees: number
   },
   ctx: ConverterContext,
 ): { center: Point; radius: number } {
-  const grCircle = primitive.gr_circle || primitive
+  const grCircle = primitive
   const center = grCircle.center || grCircle._sxCenter || { x: 0, y: 0 }
   const end = grCircle.end || grCircle._sxEnd || { x: 0, y: 0 }
   const centerlineRadius = Math.sqrt(
@@ -234,7 +263,10 @@ function getCustomPadCircle(
   )
   const strokeWidth =
     grCircle.stroke?.width || grCircle.width || grCircle._sxWidth?.value || 0
-  const fill = grCircle.fill?.value || grCircle.fill || grCircle._sxFill?.value
+  const fill =
+    typeof grCircle.fill === "string"
+      ? grCircle.fill
+      : grCircle.fill?.value || grCircle._sxFill?.value
   const radius =
     fill === "no" && strokeWidth > 0
       ? centerlineRadius + strokeWidth / 2
@@ -263,7 +295,7 @@ function createStandardSmdPad({
   pcbPortId,
 }: {
   ctx: ConverterContext
-  pad: any
+  pad: FootprintPad
   componentId: string
   pos: Point
   size: Size
@@ -408,7 +440,7 @@ function createRectSmdPad({
   ccwRotationDegrees,
 }: {
   ctx: ConverterContext
-  pad: any
+  pad: FootprintPad
   componentId: string
   pos: Point
   size: Size

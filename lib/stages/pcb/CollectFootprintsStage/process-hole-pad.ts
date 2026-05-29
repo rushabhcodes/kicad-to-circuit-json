@@ -7,6 +7,7 @@ import type {
   PcbPlatedHoleCircle,
   PcbPlatedHoleOval,
 } from "circuit-json"
+import type { FootprintPad, PadDrill } from "kicadts"
 import type { ConverterContext } from "../../../types"
 import {
   getPadRoundRectRadius,
@@ -27,11 +28,11 @@ export function createPlatedHole({
   pcbPortId,
 }: {
   ctx: ConverterContext
-  pad: any
+  pad: FootprintPad
   componentId: string
   globalPadPosition: Point
   size: Size
-  drill: any
+  drill: PadDrill | undefined
   shape: string
   layers: LayerRef[]
   pcbPortId?: string
@@ -94,25 +95,15 @@ export function createPlatedHole({
   }
 }
 
-function getDrillGeometry(drill: any) {
-  const drillX =
-    typeof drill === "object"
-      ? drill?.x || drill?._width || drill?.diameter || 0.8
-      : drill || 0.8
-  const drillY =
-    typeof drill === "object"
-      ? drill?.y || drill?._height || drill?.diameter || drillX
-      : drill || 0.8
+function getDrillGeometry(drill: PadDrill | undefined) {
+  const drillX = drill?.width || drill?.diameter || 0.8
+  const drillY = drill?.diameter || drillX
 
   return {
     drillX,
     drillY,
     holeDiameter: Math.max(drillX, drillY),
-    drillIsOval:
-      typeof drill === "object" &&
-      drillX !== undefined &&
-      drillY !== undefined &&
-      drillX !== drillY,
+    drillIsOval: Boolean(drill?.oval && drillX !== drillY),
   }
 }
 
@@ -133,7 +124,7 @@ function createRectangularPlatedHole({
   portHints,
 }: {
   ctx: ConverterContext
-  pad: any
+  pad: FootprintPad
   componentId: string
   globalPadPosition: Point
   shape: string
@@ -235,9 +226,9 @@ export function createNpthHole({
   ctx: ConverterContext
   componentId: string
   pos: Point
-  drill: any
+  drill: PadDrill | undefined
 }) {
-  const holeDiameter = drill?.diameter || drill || 1.0
+  const holeDiameter = drill?.diameter || 1.0
 
   ctx.db.pcb_hole.insert({
     type: "pcb_hole",
