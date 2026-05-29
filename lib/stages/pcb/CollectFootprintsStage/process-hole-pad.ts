@@ -15,19 +15,27 @@ import {
   type Size,
 } from "./pad-utils"
 
-export function createPlatedHole(
-  ctx: ConverterContext,
-  pad: any,
-  componentId: string,
-  pos: Point,
-  size: Size,
-  drill: any,
-  shape: string,
-  layers: LayerRef[],
-  _rotation = 0,
-  pcbPortId?: string,
-  _sourcePortId: string | undefined = undefined,
-) {
+export function createPlatedHole({
+  ctx,
+  pad,
+  componentId,
+  globalPadPosition,
+  size,
+  drill,
+  shape,
+  layers,
+  pcbPortId,
+}: {
+  ctx: ConverterContext
+  pad: any
+  componentId: string
+  globalPadPosition: Point
+  size: Size
+  drill: any
+  shape: string
+  layers: LayerRef[]
+  pcbPortId?: string
+}) {
   const { drillX, drillY, holeDiameter, drillIsOval } = getDrillGeometry(drill)
   const outerWidth = size.x
   const outerHeight = size.y
@@ -39,8 +47,8 @@ export function createPlatedHole(
       shape: "circle",
       pcb_component_id: componentId,
       pcb_port_id: pcbPortId,
-      x: pos.x,
-      y: pos.y,
+      x: globalPadPosition.x,
+      y: globalPadPosition.y,
       port_hints: portHints,
       hole_diameter: holeDiameter,
       outer_diameter: Math.max(outerWidth, outerHeight),
@@ -52,8 +60,8 @@ export function createPlatedHole(
       shape: "pill",
       pcb_component_id: componentId,
       pcb_port_id: pcbPortId,
-      x: pos.x,
-      y: pos.y,
+      x: globalPadPosition.x,
+      y: globalPadPosition.y,
       port_hints: portHints,
       hole_width: drillY,
       hole_height: drillX,
@@ -67,7 +75,7 @@ export function createPlatedHole(
       ctx,
       pad,
       componentId,
-      pos,
+      globalPadPosition,
       shape,
       drillIsOval,
       drillX,
@@ -112,7 +120,7 @@ function createRectangularPlatedHole({
   ctx,
   pad,
   componentId,
-  pos,
+  globalPadPosition,
   shape,
   drillIsOval,
   drillX,
@@ -127,7 +135,7 @@ function createRectangularPlatedHole({
   ctx: ConverterContext
   pad: any
   componentId: string
-  pos: Point
+  globalPadPosition: Point
   shape: string
   drillIsOval: boolean
   drillX: number
@@ -152,8 +160,8 @@ function createRectangularPlatedHole({
         shape: "pill_hole_with_rect_pad",
         pcb_component_id: componentId,
         pcb_port_id: pcbPortId,
-        x: pos.x,
-        y: pos.y,
+        x: globalPadPosition.x,
+        y: globalPadPosition.y,
         port_hints: portHints,
         hole_shape: "pill",
         pad_shape: "rect",
@@ -175,8 +183,8 @@ function createRectangularPlatedHole({
       shape: "rotated_pill_hole_with_rect_pad",
       pcb_component_id: componentId,
       pcb_port_id: pcbPortId,
-      x: pos.x,
-      y: pos.y,
+      x: globalPadPosition.x,
+      y: globalPadPosition.y,
       port_hints: portHints,
       hole_shape: "rotated_pill",
       pad_shape: "rect",
@@ -201,8 +209,8 @@ function createRectangularPlatedHole({
     pcb_component_id: componentId,
     pcb_port_id: pcbPortId,
     pcb_plated_hole_id: "pcb_plated_hole_id",
-    x: pos.x,
-    y: pos.y,
+    x: globalPadPosition.x,
+    y: globalPadPosition.y,
     port_hints: portHints,
     hole_shape: "circle",
     pad_shape: "rect",
@@ -218,13 +226,17 @@ function createRectangularPlatedHole({
   ctx.db.pcb_plated_hole.insert(platedHole)
 }
 
-export function createNpthHole(
-  ctx: ConverterContext,
-  _pad: any,
-  componentId: string,
-  pos: Point,
-  drill: any,
-) {
+export function createNpthHole({
+  ctx,
+  componentId,
+  pos,
+  drill,
+}: {
+  ctx: ConverterContext
+  componentId: string
+  pos: Point
+  drill: any
+}) {
   const holeDiameter = drill?.diameter || drill || 1.0
 
   ctx.db.pcb_hole.insert({

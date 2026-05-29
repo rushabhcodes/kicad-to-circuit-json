@@ -55,11 +55,14 @@ export function getPadRoundRectRadius(
   return (minDimension * roundrectRatio) / 2
 }
 
-export function rotatePadOffset(
-  padAt: { x: number; y: number },
-  componentRotation: number,
-): Point {
-  const rotationRad = (-componentRotation * Math.PI) / 180
+export function rotatePadOffset({
+  padAt,
+  componentCcwRotationDegrees,
+}: {
+  padAt: { x: number; y: number }
+  componentCcwRotationDegrees: number
+}): Point {
+  const rotationRad = (-componentCcwRotationDegrees * Math.PI) / 180
 
   return {
     x: padAt.x * Math.cos(rotationRad) - padAt.y * Math.sin(rotationRad),
@@ -67,12 +70,19 @@ export function rotatePadOffset(
   }
 }
 
-export function getPadKicadPosition(
-  kicadComponentPos: Point,
-  padAt: { x: number; y: number },
-  componentRotation: number,
-): Point {
-  const rotatedPadOffset = rotatePadOffset(padAt, componentRotation)
+export function getPadKicadPosition({
+  kicadComponentPos,
+  padAt,
+  componentCcwRotationDegrees,
+}: {
+  kicadComponentPos: Point
+  padAt: { x: number; y: number }
+  componentCcwRotationDegrees: number
+}): Point {
+  const rotatedPadOffset = rotatePadOffset({
+    padAt,
+    componentCcwRotationDegrees,
+  })
   return {
     x: kicadComponentPos.x + rotatedPadOffset.x,
     y: kicadComponentPos.y + rotatedPadOffset.y,

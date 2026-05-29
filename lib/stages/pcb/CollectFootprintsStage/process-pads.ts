@@ -25,7 +25,7 @@ export function processPads(
   footprint: Footprint,
   componentId: string,
   kicadComponentPos: { x: number; y: number },
-  componentRotation: number,
+  componentCcwRotationDegrees: number,
 ) {
   if (!ctx.k2cMatPcb) return
 
@@ -38,7 +38,7 @@ export function processPads(
       pad,
       componentId,
       kicadComponentPos,
-      componentRotation,
+      componentCcwRotationDegrees,
     })
   }
 }
@@ -51,24 +51,24 @@ export function processPad({
   pad,
   componentId,
   kicadComponentPos,
-  componentRotation,
+  componentCcwRotationDegrees,
 }: {
   ctx: ConverterContext
   pad: any
   componentId: string
   kicadComponentPos: { x: number; y: number }
-  componentRotation: number
+  componentCcwRotationDegrees: number
 }): void {
   if (!ctx.k2cMatPcb) return
 
   const padAt = getPadAt(pad)
   const padType = getPadType(pad)
   const padShape = getPadShape(pad)
-  const padKicadPos = getPadKicadPosition(
+  const padKicadPos = getPadKicadPosition({
     kicadComponentPos,
     padAt,
-    componentRotation,
-  )
+    componentCcwRotationDegrees,
+  })
   const globalPos = getGlobalPadPosition(ctx, padKicadPos)
   const size = getPadSize(pad)
   const drill = pad.drill
@@ -89,7 +89,6 @@ export function processPad({
   // Create pcb_port for this pad (if it has a pad number)
   const padNumber = pad.number?.toString()
   let pcbPortId: string | undefined
-  let sourcePortId: string | undefined
   if (padNumber) {
     const padLayers =
       padType === "smd"
@@ -98,7 +97,7 @@ export function processPad({
           ? copperLayers
           : []
 
-    const padPortInfo: PadPortInfo = {
+    const padPort: PadPortInfo = {
       padNumber,
       padType,
       layers: padLayers,
@@ -108,12 +107,8 @@ export function processPad({
     pcbPortId = createPcbPort({
       ctx,
       componentId,
-      padInfo: padPortInfo,
+      padInfo: padPort,
     })
-
-    if (pcbPortId) {
-      sourcePortId = `${componentId}_port_${padNumber}`
-    }
   }
 
   // Determine pad type and create appropriate CJ element
@@ -134,21 +129,24 @@ export function processPad({
       totalCcwRotationDegrees,
     })
   } else if (padType === "np_thru_hole") {
-    createNpthHole(ctx, pad, componentId, globalPos, drill)
+    createNpthHole({
+      ctx,
+      componentId,
+      pos: globalPos,
+      drill,
+    })
   } else {
     // thru_hole (plated)
-    createPlatedHole(
+    createPlatedHole({
       ctx,
       pad,
       componentId,
-      globalPos,
+      globalPadPosition: globalPos,
       size,
       drill,
-      padShape,
-      copperLayers,
-      totalCcwRotationDegrees,
+      shape: padShape,
+      layers: copperLayers,
       pcbPortId,
-      sourcePortId,
-    )
+    })
   }
 }

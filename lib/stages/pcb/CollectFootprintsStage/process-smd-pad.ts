@@ -102,9 +102,11 @@ function createCustomSmdPadPrimitives({
   for (const primitive of primitivesArray) {
     if (primitive.token === "gr_poly") {
       const polygonPoints = getCustomPadPolygonPoints(
-        primitive,
-        padKicadPos,
-        totalCcwRotationDegrees,
+        {
+          primitive,
+          padKicadPos,
+          totalCcwRotationDegrees,
+        },
         ctx,
       )
 
@@ -125,9 +127,11 @@ function createCustomSmdPadPrimitives({
 
     if (primitive.token === "gr_circle") {
       const circle = getCustomPadCircle(
-        primitive,
-        padKicadPos,
-        totalCcwRotationDegrees,
+        {
+          primitive,
+          padKicadPos,
+          totalCcwRotationDegrees,
+        },
         ctx,
       )
 
@@ -153,9 +157,15 @@ function createCustomSmdPadPrimitives({
 }
 
 function getCustomPadPolygonPoints(
-  primitive: any,
-  padKicadPos: Point,
-  totalCcwRotationDegrees: number,
+  {
+    primitive,
+    padKicadPos,
+    totalCcwRotationDegrees,
+  }: {
+    primitive: any
+    padKicadPos: Point
+    totalCcwRotationDegrees: number
+  },
   ctx: ConverterContext,
 ): Point[] {
   const grPoly = primitive.gr_poly || primitive
@@ -205,9 +215,15 @@ function getCustomPrimitivePoints(grPoly: any): any[] {
 }
 
 function getCustomPadCircle(
-  primitive: any,
-  padKicadPos: Point,
-  totalCcwRotationDegrees: number,
+  {
+    primitive,
+    padKicadPos,
+    totalCcwRotationDegrees,
+  }: {
+    primitive: any
+    padKicadPos: Point
+    totalCcwRotationDegrees: number
+  },
   ctx: ConverterContext,
 ): { center: Point; radius: number } {
   const grCircle = primitive.gr_circle || primitive
