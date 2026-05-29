@@ -6,9 +6,7 @@ import type {
   PcbSmtPadRotatedPill,
   PcbSmtPadRotatedRect,
 } from "circuit-json"
-import type {
-  FootprintPad,
-} from "kicadts"
+import type { FootprintPad } from "kicadts"
 import { applyToPoint } from "transformation-matrix"
 import type { ConverterContext } from "../../../types"
 import { determineLayerFromLayers } from "./layer-utils"
