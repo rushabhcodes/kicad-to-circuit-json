@@ -213,7 +213,9 @@ function findMatchingViaSvgTransform({
             if (
               transform &&
               pcbVias.every((via) =>
-                renderedViaCenterKeys.has(getPointKey(toScreen(via, transform))),
+                renderedViaCenterKeys.has(
+                  getPointKey(toScreen(via, transform)),
+                ),
               )
             ) {
               return transform
