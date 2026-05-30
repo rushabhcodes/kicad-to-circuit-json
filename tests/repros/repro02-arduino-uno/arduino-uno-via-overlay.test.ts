@@ -160,7 +160,7 @@ function inferPcbSvgTransform({
   const renderedViaCenterKeys = new Set(
     renderedViaCenters.map((point) => getPointKey(point)),
   )
-  const bestTransform = findViaSvgTransform({
+  const bestTransform = findMatchingViaSvgTransform({
     pcbVias,
     renderedViaCenters,
     renderedViaCenterKeys,
@@ -173,7 +173,7 @@ function inferPcbSvgTransform({
   return bestTransform
 }
 
-function findViaSvgTransform({
+function findMatchingViaSvgTransform({
   pcbVias,
   renderedViaCenters,
   renderedViaCenterKeys,
@@ -210,11 +210,12 @@ function findViaSvgTransform({
               screenB: mappedScreenB,
             })
 
-            if (!transform) {
-              continue
-            }
-
-            if (transformMatchesAllVias(transform, pcbVias, renderedViaCenterKeys)) {
+            if (
+              transform &&
+              pcbVias.every((via) =>
+                renderedViaCenterKeys.has(getPointKey(toScreen(via, transform))),
+              )
+            ) {
               return transform
             }
           }
@@ -265,16 +266,6 @@ function inferTransformFromPair({
     translateX: screenA.x - scale * circuitA.x,
     translateY: screenA.y + scale * circuitA.y,
   }
-}
-
-function transformMatchesAllVias(
-  transform: { scale: number; translateX: number; translateY: number },
-  pcbVias: Array<{ x: number; y: number }>,
-  renderedViaCenterKeys: Set<string>,
-) {
-  return pcbVias.every((via) =>
-    renderedViaCenterKeys.has(getPointKey(toScreen(via, transform))),
-  )
 }
 
 function addViaOverlayToSvg({
