@@ -241,4 +241,4 @@ test("kicad-to-circuit-json: pic_programmer schematic", async () => {
     import.meta.path,
     "pic_programmer-schematic",
   )
-}, 30_000)
+}, 10_000)
