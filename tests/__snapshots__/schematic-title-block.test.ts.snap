@@ -1,0 +1,28 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`HSP USB LED title block survives a saved-bundle round trip 1`] = `
+{
+  "paperSize": {
+    "height": 210,
+    "isPortrait": false,
+    "name": "A4",
+    "width": 297,
+  },
+  "titleBlock": {
+    "comments": [
+      {
+        "index": 1,
+        "text": "Hackerspace: Intro to PCB Design",
+      },
+      {
+        "index": 2,
+        "text": "Licensed under CERN-OHL-P-2.0",
+      },
+    ],
+    "company": "NUS Hackers",
+    "date": "2026-02-04",
+    "revision": "v1.0.0",
+    "title": "LED with USB-C",
+  },
+}
+`;

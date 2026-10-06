@@ -1,6 +1,10 @@
 import { cju } from "@tscircuit/circuit-json-util"
 import type { AnyCircuitElement } from "circuit-json"
 import { parseKicadPcb, parseKicadSch, parseKicadSym } from "kicadts"
+import {
+  getKicadSchematicMetadata,
+  type KicadSchematicMetadata,
+} from "./get-kicad-schematic-metadata"
 import { CollectFootprintsStage } from "./stages/pcb/CollectFootprintsStage"
 import { CollectGraphicsStage } from "./stages/pcb/CollectGraphicsStage"
 import { CollectNetsStage } from "./stages/pcb/CollectNetsStage"
@@ -18,6 +22,11 @@ import { InitializeSchematicContextStage } from "./stages/schematic/InitializeSc
 import { CollectSymbolLibrarySymbolsStage } from "./stages/symbol-library/CollectSymbolLibrarySymbolsStage"
 import { InitializeSymbolLibraryContextStage } from "./stages/symbol-library/InitializeSymbolLibraryContextStage"
 import type { ConverterContext, ConverterStage } from "./types"
+
+export interface KicadCircuitJsonBundle {
+  circuitJson: AnyCircuitElement[]
+  schematicMetadata?: KicadSchematicMetadata
+}
 
 export class KicadToCircuitJsonConverter {
   fsMap: Record<string, string> = {}
@@ -138,6 +147,21 @@ export class KicadToCircuitJsonConverter {
 
   getOutputString() {
     return JSON.stringify(this.getOutput(), null, 2)
+  }
+
+  /**
+   * Serializable circuit data and document metadata for a KiCad round trip.
+   * Pass schematicMetadata as circuit-json-to-kicad's schematic options.
+   */
+  getOutputBundle(): KicadCircuitJsonBundle {
+    const circuitJson = this.getOutput()
+    const schematic = this.ctx?.kicadSch
+    return {
+      circuitJson,
+      ...(schematic
+        ? { schematicMetadata: getKicadSchematicMetadata(schematic) }
+        : {}),
+    }
   }
 
   getWarnings() {
