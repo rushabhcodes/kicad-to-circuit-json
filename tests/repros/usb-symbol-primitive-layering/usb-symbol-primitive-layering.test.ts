@@ -4,8 +4,6 @@ import { fileURLToPath } from "node:url"
 import sharp from "sharp"
 import { KicadToCircuitJsonConverter } from "../../../lib"
 import { stackCircuitJsonKicadPngs } from "../../fixtures/stackCircuitJsonKicadPngs"
-import { stackPngsVertically } from "../../fixtures/stackPngsVertically"
-import { takeSchematicTitleBlockSnapshot } from "../../fixtures/take-schematic-title-block-snapshot"
 import { takeKicadSnapshot } from "../../fixtures/take-kicad-snapshot"
 import "../../fixtures/png-matcher"
 
@@ -115,17 +113,7 @@ test("preserves and layers USB connector symbol graphics", async () => {
       .toBuffer(),
     sharp(kicadSvg, { density: snapshotDensity }).png().toBuffer(),
   ])
-  const bundle = converter.getOutputBundle()
-  expect(bundle.schematicMetadata).toMatchSnapshot()
-  const titleBlockPng = await takeSchematicTitleBlockSnapshot({
-    bundle,
-    sourceSchematicPath: fileURLToPath(schematicPath),
-    sourceSvg: kicadSvg,
-  })
-  const stackedPng = await stackPngsVertically([
-    await stackCircuitJsonKicadPngs(circuitJsonPng, kicadPng),
-    titleBlockPng,
-  ])
+  const stackedPng = await stackCircuitJsonKicadPngs(circuitJsonPng, kicadPng)
 
   await expect(stackedPng).toMatchPngSnapshot(
     import.meta.path,

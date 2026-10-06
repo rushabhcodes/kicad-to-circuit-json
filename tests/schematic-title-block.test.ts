@@ -1,144 +1,76 @@
 import { expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-import { CircuitJsonToKicadSchConverter } from "circuit-json-to-kicad"
-import { parseKicadSch } from "kicadts"
+import { schematic_text } from "circuit-json"
+import { convertCircuitJsonToSchematicSvg } from "circuit-to-svg"
 import { KicadToCircuitJsonConverter } from "../lib"
-import { takeSchematicTitleBlockSnapshot } from "./fixtures/take-schematic-title-block-snapshot"
-import "./fixtures/png-matcher"
 
-const convert = (content: string) => {
+const convert = (paper = '(paper "A4")', titleBlock = "") => {
   const converter = new KicadToCircuitJsonConverter()
-  converter.addFile("document.kicad_sch", content)
+  converter.addFile(
+    "document.kicad_sch",
+    `(kicad_sch (version 20250114) (generator eeschema)
+      (uuid 9c6b5f7c-8b32-4b54-b004-3e5857f4d422)
+      ${paper} ${titleBlock} (lib_symbols))`,
+  )
   converter.runUntilFinished()
   return converter
 }
 
-const schematic = (paper = '(paper "A4")', titleBlock = "") =>
-  `(kicad_sch (version 20250114) (generator eeschema)
-    (uuid 9c6b5f7c-8b32-4b54-b004-3e5857f4d422)
-    ${paper} ${titleBlock} (lib_symbols))`
-
-test("a serialized import bundle retains title-block fields without the source file", () => {
+test("title-block fields survive the normal Circuit JSON output and render as schematic text", () => {
   const converter = convert(
-    schematic(
-      '(paper "A4")',
-      `(title_block (title "ECC Push-Pull") (date "Sat 21 Mar 2015")
-        (rev "0.1") (company "Example Company")
-        (comment 1 "Open hardware") (comment 4 "Preserve comment indices"))`,
-    ),
+    '(paper "A4")',
+    `(title_block (title "ECC Push-Pull") (date "Sat 21 Mar 2015")
+      (rev "0.1") (company "Example Company")
+      (comment 1 "Open hardware") (comment 4 "Preserve comment indices"))`,
   )
-  const bundle = JSON.parse(JSON.stringify(converter.getOutputBundle()))
-  expect(bundle.schematicMetadata.titleBlock).toEqual({
-    title: "ECC Push-Pull",
-    date: "Sat 21 Mar 2015",
-    revision: "0.1",
-    company: "Example Company",
-    comments: [
-      { index: 1, text: "Open hardware" },
-      { index: 4, text: "Preserve comment indices" },
-    ],
-  })
-
-  const exporter = new CircuitJsonToKicadSchConverter(
-    bundle.circuitJson,
-    bundle.schematicMetadata,
-  )
-  exporter.runUntilFinished()
-  const titleBlock = parseKicadSch(exporter.getOutputString()).titleBlock!
-  expect(titleBlock.title).toBe("ECC Push-Pull")
-  expect(titleBlock.date).toBe("Sat 21 Mar 2015")
-  expect(titleBlock.rev).toBe("0.1")
-  expect(titleBlock.company).toBe("Example Company")
-  expect(titleBlock.getComment(1)).toBe("Open hardware")
-  expect(titleBlock.getComment(4)).toBe("Preserve comment indices")
-  expect(titleBlock.getComment(2)).toBeUndefined()
-  expect(converter.getOutputBundle().circuitJson).toEqual(converter.getOutput())
-  expect(JSON.parse(converter.getOutputString())).toEqual(converter.getOutput())
+  const circuitJson = JSON.parse(converter.getOutputString())
+  expect(circuitJson).toEqual(converter.getOutput())
+  const texts = converter
+    .getOutput()
+    .filter((element) => element.type === "schematic_text")
+  expect(texts.map((element) => element.text)).toEqual([
+    "Title: ECC Push-Pull",
+    "Date: Sat 21 Mar 2015",
+    "Rev: 0.1",
+    "Example Company",
+    "Open hardware",
+    "Preserve comment indices",
+  ])
+  for (const text of texts) {
+    expect(schematic_text.safeParse(text).success).toBe(true)
+    expect(text.schematic_component_id).toBeUndefined()
+  }
+  // Sparse comment indices retain their worksheet rows, separated by 9 mm.
+  expect(texts[5]!.position.y - texts[4]!.position.y).toBeCloseTo(9 / 15)
+  const svg = convertCircuitJsonToSchematicSvg(circuitJson)
+  for (const text of texts) expect(svg).toContain(text.text)
 })
 
 test.each([
-  ['(paper "A3")', "A3", 420, 297, false, undefined],
-  ['(paper "A4" portrait)', "A4", 210, 297, true, undefined],
-  ['(paper "USLetter")', "USLetter", 279.4, 215.9, false, undefined],
-  [
-    '(paper "User" 320 180 portrait)',
-    "User",
-    180,
-    320,
-    true,
-    { width: 320, height: 180 },
-  ],
+  ['(paper "A4")', 297, 210],
+  ['(paper "A5")', 210, 148],
+  ['(paper "A4" portrait)', 210, 297],
+  ['(paper "USLetter")', 279.4, 215.9],
+  ['(paper "User" 320 180 portrait)', 180, 320],
 ] as const)(
-  "retains the document paper %s",
-  (paper, name, width, height, isPortrait, customSize) => {
-    const bundle = convert(schematic(paper)).getOutputBundle()
-    expect(bundle.schematicMetadata?.paperSize).toEqual({
-      name,
-      width,
-      height,
-      isPortrait,
-      ...(customSize ? { customSize } : {}),
-    })
-    const exporter = new CircuitJsonToKicadSchConverter(
-      bundle.circuitJson,
-      bundle.schematicMetadata,
-    )
-    exporter.runUntilFinished()
-    const exportedPaper = parseKicadSch(exporter.getOutputString()).paper!
-    expect(exportedPaper.isPortrait).toBe(isPortrait)
-    if (customSize) expect(exportedPaper.customSize).toEqual(customSize)
-    else expect(exportedPaper.size).toBe(name)
+  "places title-block text on the document paper %s",
+  (paper, width, height) => {
+    const texts = convert(paper, '(title_block (title "Document") (rev "1"))')
+      .getOutput()
+      .filter((element) => element.type === "schematic_text")
+    expect(texts[0]!.position.x).toBeCloseTo((width - 119 - 105) / 15)
+    expect(texts[0]!.position.y).toBeCloseTo(-(height - 20.7 - 148.5) / 15)
+    expect(texts[0]!.font_size).toBeCloseTo(2 / 15)
+    expect(texts[1]!.position.x).toBeCloseTo((width - 34 - 105) / 15)
+    expect(texts[1]!.position.y).toBeCloseTo(-(height - 16.9 - 148.5) / 15)
   },
 )
 
-test("absent document metadata is not replaced with invented title fields", () => {
-  const converter = new KicadToCircuitJsonConverter()
-  expect(converter.getOutputBundle()).toEqual({ circuitJson: [] })
-  const bundle = convert(schematic()).getOutputBundle()
-  expect(bundle.schematicMetadata?.titleBlock).toBeUndefined()
-  const exporter = new CircuitJsonToKicadSchConverter(
-    bundle.circuitJson,
-    bundle.schematicMetadata,
-  )
-  exporter.runUntilFinished()
-  expect(parseKicadSch(exporter.getOutputString()).titleBlock).toBeUndefined()
-})
-
-test("document metadata returned to callers does not mutate the parsed source", () => {
-  const converter = convert(
-    schematic('(paper "User" 320 180)', '(title_block (comment 1 "Original"))'),
-  )
-  const bundle = converter.getOutputBundle()
-  bundle.schematicMetadata!.titleBlock!.comments![0]!.text = "Changed"
-  bundle.schematicMetadata!.paperSize!.customSize!.width = 1
+test("absent and empty title-block fields do not create placeholder text", () => {
+  expect(convert().getOutput()).toEqual([])
   expect(
-    converter.getOutputBundle().schematicMetadata?.titleBlock?.comments,
-  ).toEqual([{ index: 1, text: "Original" }])
-  expect(
-    converter.getOutputBundle().schematicMetadata?.paperSize?.customSize?.width,
-  ).toBe(320)
+    convert(
+      '(paper "A4")',
+      '(title_block (title "") (date "") (rev "") (company "") (comment 1 ""))',
+    ).getOutput(),
+  ).toEqual([])
 })
-
-test("HSP USB LED title block survives a saved-bundle round trip", async () => {
-  const sourcePath = new URL("./assets/hsp-usb-led.kicad_sch", import.meta.url)
-  const converter = convert(readFileSync(sourcePath, "utf8"))
-  const bundle = converter.getOutputBundle()
-  expect(bundle.schematicMetadata?.titleBlock).toEqual({
-    title: "LED with USB-C",
-    date: "2026-02-04",
-    revision: "v1.0.0",
-    company: "NUS Hackers",
-    comments: [
-      { index: 1, text: "Hackerspace: Intro to PCB Design" },
-      { index: 2, text: "Licensed under CERN-OHL-P-2.0" },
-    ],
-  })
-  expect(bundle.schematicMetadata).toMatchSnapshot()
-  await expect(
-    takeSchematicTitleBlockSnapshot({
-      bundle,
-      sourceSchematicPath: fileURLToPath(sourcePath),
-    }),
-  ).toMatchPngSnapshot(import.meta.path, "hsp-usb-led-title-block")
-}, 30_000)

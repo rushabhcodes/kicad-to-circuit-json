@@ -170,21 +170,3 @@ exports[`preserves and layers USB connector symbol graphics 1`] = `
   },
 ]
 `;
-
-exports[`preserves and layers USB connector symbol graphics 2`] = `
-{
-  "paperSize": {
-    "height": 148,
-    "isPortrait": false,
-    "name": "A5",
-    "width": 210,
-  },
-  "titleBlock": {
-    "comments": [],
-    "company": undefined,
-    "date": undefined,
-    "revision": "1.0",
-    "title": "OtterCastAudioV2",
-  },
-}
-`;

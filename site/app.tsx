@@ -1,5 +1,4 @@
 import {
-  type KicadCircuitJsonBundle,
   KicadFootprintToCircuitJsonConverter,
   KicadSymbolToCircuitJsonConverter,
   KicadToCircuitJsonConverter,
@@ -39,8 +38,6 @@ const runframeStandalonePreviewUrl =
 export function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [circuitJson, setCircuitJson] = useState<CircuitJson | null>(null)
-  const [outputBundle, setOutputBundle] =
-    useState<KicadCircuitJsonBundle | null>(null)
   const [simpleRouteJson, setSimpleRouteJson] =
     useState<SimpleRouteJson | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -120,7 +117,6 @@ export function App() {
     if (!inputKind) {
       startTransition(() => {
         setCircuitJson(null)
-        setOutputBundle(null)
         setSimpleRouteJson(null)
         setErrorMessage(
           "Drop a .kicad_mod, .kicad_pcb, .kicad_sch, or .kicad_sym file.",
@@ -151,10 +147,6 @@ export function App() {
       converter.runUntilFinished()
 
       const nextCircuitJson = converter.getOutput()
-      const nextOutputBundle =
-        converter instanceof KicadToCircuitJsonConverter
-          ? converter.getOutputBundle()
-          : null
       const nextWarnings = [...converter.getWarnings()]
       let nextSimpleRouteJson: SimpleRouteJson | null = null
 
@@ -176,7 +168,6 @@ export function App() {
 
       startTransition(() => {
         setCircuitJson(nextCircuitJson)
-        setOutputBundle(nextOutputBundle)
         setSimpleRouteJson(nextSimpleRouteJson)
         setErrorMessage(null)
         setFileName(nextFileName)
@@ -186,7 +177,6 @@ export function App() {
     } catch (error) {
       startTransition(() => {
         setCircuitJson(null)
-        setOutputBundle(null)
         setSimpleRouteJson(null)
         setErrorMessage(
           error instanceof Error ? error.message : "Conversion failed.",
@@ -282,21 +272,6 @@ export function App() {
               >
                 Download Circuit JSON
               </button>
-              {outputBundle?.schematicMetadata ? (
-                <button
-                  className="secondary-button"
-                  type="button"
-                  title="Includes the schematic title block and paper size"
-                  onClick={() =>
-                    downloadJsonFile(
-                      outputBundle,
-                      `${outputBaseName}.kicad-import.json`,
-                    )
-                  }
-                >
-                  Download import bundle
-                </button>
-              ) : null}
               <button
                 className="secondary-button"
                 type="button"

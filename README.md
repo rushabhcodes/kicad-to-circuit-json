@@ -38,33 +38,6 @@ console.log("Warnings:", converter.getWarnings())
 console.log("Stats:", converter.getStats())
 ```
 
-### Preserve schematic document metadata
-
-For a KiCad round trip, save `getOutputBundle()` rather than only the element
-array. The bundle includes the title block (title, date, revision, company,
-and indexed comments) and the original paper size and orientation. These
-document fields are not represented by the current Circuit JSON element schema.
-`getOutput()` and `getOutputString()` retain their existing array format.
-
-```typescript
-import { CircuitJsonToKicadSchConverter } from "circuit-json-to-kicad"
-
-// Persist everything required to retain the document metadata.
-const saved = JSON.stringify(converter.getOutputBundle())
-const { circuitJson, schematicMetadata } = JSON.parse(saved)
-
-// No original KiCad file is needed when exporting the saved bundle.
-const exporter = new CircuitJsonToKicadSchConverter(
-  circuitJson,
-  schematicMetadata,
-)
-exporter.runUntilFinished()
-fs.writeFileSync("roundtrip.kicad_sch", exporter.getOutputString())
-```
-
-The browser viewer offers **Download import bundle** for schematics in addition
-to the existing Circuit JSON download.
-
 For a single `.kicad_mod` footprint, use the dedicated footprint converter:
 
 ```typescript
