@@ -69,25 +69,28 @@ test.each([
     true,
     { width: 320, height: 180 },
   ],
-] as const)("retains the document paper %s", (paper, name, width, height, isPortrait, customSize) => {
-  const bundle = convert(schematic(paper)).getOutputBundle()
-  expect(bundle.schematicMetadata?.paperSize).toEqual({
-    name,
-    width,
-    height,
-    isPortrait,
-    ...(customSize ? { customSize } : {}),
-  })
-  const exporter = new CircuitJsonToKicadSchConverter(
-    bundle.circuitJson,
-    bundle.schematicMetadata,
-  )
-  exporter.runUntilFinished()
-  const exportedPaper = parseKicadSch(exporter.getOutputString()).paper!
-  expect(exportedPaper.isPortrait).toBe(isPortrait)
-  if (customSize) expect(exportedPaper.customSize).toEqual(customSize)
-  else expect(exportedPaper.size).toBe(name)
-})
+] as const)(
+  "retains the document paper %s",
+  (paper, name, width, height, isPortrait, customSize) => {
+    const bundle = convert(schematic(paper)).getOutputBundle()
+    expect(bundle.schematicMetadata?.paperSize).toEqual({
+      name,
+      width,
+      height,
+      isPortrait,
+      ...(customSize ? { customSize } : {}),
+    })
+    const exporter = new CircuitJsonToKicadSchConverter(
+      bundle.circuitJson,
+      bundle.schematicMetadata,
+    )
+    exporter.runUntilFinished()
+    const exportedPaper = parseKicadSch(exporter.getOutputString()).paper!
+    expect(exportedPaper.isPortrait).toBe(isPortrait)
+    if (customSize) expect(exportedPaper.customSize).toEqual(customSize)
+    else expect(exportedPaper.size).toBe(name)
+  },
+)
 
 test("absent document metadata is not replaced with invented title fields", () => {
   const converter = new KicadToCircuitJsonConverter()
